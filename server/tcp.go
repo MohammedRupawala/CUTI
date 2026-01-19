@@ -2,6 +2,7 @@ package server
 
 import (
 	"echoserver/mod/config"
+	"echoserver/mod/core"
 	"io"
 	"log"
 	"net"
@@ -16,6 +17,8 @@ func readCommand(conn net.Conn) (string,error) {
 	if err != nil {
 		return "",err
 	}
+
+	//  := core.Decode(read[:n]);
 
 	return string(read[:n]),nil
 }

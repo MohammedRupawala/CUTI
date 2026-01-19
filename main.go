@@ -17,4 +17,9 @@ func main() {
 	setUp()
 	server.TcpSyncServer()
 
+
+
+	// core_test.TestArrayDecode
+
+
 }
