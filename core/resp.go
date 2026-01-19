@@ -1,6 +1,10 @@
 package core
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	// "log"
+)
 
 func readLength(data []byte) (int, int) {
 	val := 0
@@ -12,7 +16,6 @@ func readLength(data []byte) (int, int) {
 
 	return val, pos + 2
 }
-
 
 func decodeSimpleString(data []byte) (interface{}, error, int) {
 	pos := 1
@@ -34,7 +37,6 @@ func decodeBulkString(data []byte) (interface{}, error, int) {
 	return string(data[pos : pos+length]), nil, pos + length + 2
 }
 
-
 func decodeInt(data []byte) (interface{}, error, int) {
 	var num int64 = 0
 	pos := 1
@@ -45,7 +47,6 @@ func decodeInt(data []byte) (interface{}, error, int) {
 
 	return num, nil, pos + 2
 }
-
 
 func decodeArrays(data []byte) ([]interface{}, error, int) {
 	len, delta := readLength(data)
@@ -66,7 +67,26 @@ func decodeArrays(data []byte) ([]interface{}, error, int) {
 		pos += delta
 	}
 
+	// var str []string
+
 	return ele, nil, pos
+}
+
+func DecodeArrayString(data []byte) ([]string, error) {
+	res, err := Decode(data)
+
+	if err != nil {
+		return []string{}, nil
+	}
+
+	val := res.([]interface{})
+	var arr = make([]string, len(val))
+
+	for i := range val {
+		arr[i] = val[i].(string)
+	}
+
+	return arr, nil
 }
 func Parse(data []byte) (interface{}, error, int) {
 	switch data[0] {
@@ -89,6 +109,8 @@ func Parse(data []byte) (interface{}, error, int) {
 }
 
 func Decode(data []byte) (interface{}, error) {
+
+	// log.Println("Recived Command " , string(data))
 	if len(data) <= 0 {
 		return nil, errors.New("No Data")
 	}
@@ -96,4 +118,19 @@ func Decode(data []byte) (interface{}, error) {
 	val, err, _ := Parse(data)
 
 	return val, err
+}
+
+func Encode(val interface{}, isSimple bool) []byte {
+
+	switch v := val.(type) {
+	case string:
+		if isSimple {
+			return []byte(fmt.Sprintf("+%s\r\n",v))
+		}
+
+		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
+	}
+
+	return []byte{}
+
 }
