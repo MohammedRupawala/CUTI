@@ -10,7 +10,7 @@ import (
 	// "strings"
 )
 
-func readCommand(conn net.Conn) (*core.RedisCmd, error) {
+func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
 	var read [512]byte
 
 	n, err := conn.Read(read[:])
@@ -31,7 +31,7 @@ func readCommand(conn net.Conn) (*core.RedisCmd, error) {
 	// return string(read[:n]), nil
 }
 
-func writeCommand(conn net.Conn, command *core.RedisCmd) {
+func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
     // mess := strings.ToLower(command.Cmd)
 
 	// log.Println(string(command.Cmd))

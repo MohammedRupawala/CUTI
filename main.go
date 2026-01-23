@@ -15,7 +15,7 @@ func setUp() {
 func main() {
 	log.Println("Lets Win THis")
 	setUp()
-	server.TcpSyncServer()
+	server.AsyncTCPServer()
 
 
 
