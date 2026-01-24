@@ -17,7 +17,9 @@ func main() {
 	setUp()
 	server.AsyncTCPServer()
 
-
+	if err := server.AsyncTCPServer(); err != nil {
+		log.Fatal("Server failed:", err)
+	}
 
 	// core_test.TestArrayDecode
 

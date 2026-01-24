@@ -9,9 +9,14 @@ import (
 	"syscall"
 )
 
+// SO_REUSEPORT is not defined in syscall on some platforms, so define it if missing
+const SO_REUSEPORT = 0x0F
 
 var con_clients int = 0
+
 func AsyncTCPServer() error {
+
+
 	log.Println("Welcome To Async Server " + config.Host + " Running at Port " + strconv.Itoa(config.Port))
 
 	var max_client int = 20000
@@ -23,13 +28,21 @@ func AsyncTCPServer() error {
 	if err != nil {
 		return err
 	}
-	
+
+	log.Println("Server is Running")
 	defer syscall.Close(serverFD)
 
 	err = syscall.SetNonblock(serverFD, true)
 	if err != nil {
 		return err
 	}
+
+	syscall.SetsockoptInt(
+		serverFD,
+		syscall.SOL_SOCKET,
+		SO_REUSEPORT,
+		1,
+	)
 
 	ip4 := net.ParseIP(config.Host)
 	if err = syscall.Bind(serverFD, &syscall.SockaddrInet4{
@@ -44,63 +57,61 @@ func AsyncTCPServer() error {
 	}
 
 	epollFD, err := syscall.EpollCreate1(0)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
 	defer syscall.Close(epollFD)
 	var socketServerEvent syscall.EpollEvent = syscall.EpollEvent{
-		Events : syscall.EPOLLIN,
-		Fd : int32(serverFD),
+		Events: syscall.EPOLLIN,
+		Fd:     int32(serverFD),
 	}
 
-	if err = syscall.EpollCtl(epollFD,syscall.EPOLL_CTL_ADD,serverFD,&socketServerEvent); err != nil{
+	if err = syscall.EpollCtl(epollFD, syscall.EPOLL_CTL_ADD, serverFD, &socketServerEvent); err != nil {
 		return err
 	}
 
 	for {
-		nevents , e := syscall.EpollWait(epollFD,events[:],-1)
-		if e != nil{
-			continue;
+		nevents, e := syscall.EpollWait(epollFD, events[:], -1)
+		if e != nil {
+			continue
 		}
 
-
-		for i := 0;i<nevents;i++{
-				if(int(events[i].Fd) == serverFD){
-					fd , _ , err := syscall.Accept(serverFD)
-					if err != nil{
-						continue
-					}
-
-					con_clients++;
-					syscall.SetNonblock(serverFD,true)
-					log.Println("Client Connected with Fd Number " , fd )
-
-					var socketClient syscall.EpollEvent = syscall.EpollEvent{
-						Events: syscall.EPOLLIN,
-						Fd : int32(fd),
-					}
-
-					if err = syscall.EpollCtl(epollFD,syscall.EPOLL_CTL_ADD,fd,&socketClient); err != nil{
-						log.Fatal(err)
-					}
-
-
-					// log.Println("Connected With Client " + sockaddrToString(addr))
-					
-				}else{
-					comm := core.FDComm{Fd : int(events[i].Fd)}
-					cmd , err := readCommand(comm)
-
-					if(err != nil){
-						syscall.Close(int(events[i].Fd))
-						con_clients--;
-						continue
-					}
-
-					writeCommand(comm,cmd)
-					
+		for i := 0; i < nevents; i++ {
+			if int(events[i].Fd) == serverFD {
+				fd, _, err := syscall.Accept(serverFD)
+				if err != nil {
+					continue
 				}
+
+				con_clients++
+				syscall.SetNonblock(serverFD, true)
+				// log.Println("Client Connected with Fd Number ", fd)
+
+				var socketClient syscall.EpollEvent = syscall.EpollEvent{
+					Events: syscall.EPOLLIN,
+					Fd:     int32(fd),
+				}
+
+				if err = syscall.EpollCtl(epollFD, syscall.EPOLL_CTL_ADD, fd, &socketClient); err != nil {
+					log.Fatal(err)
+				}
+
+				// log.Println("Connected With Client " + sockaddrToString(addr))
+
+			} else {
+				comm := core.FDComm{Fd: int(events[i].Fd)}
+				cmd, err := readCommand(comm)
+				// log.Println("Command Recieved: " + cmd.Cmd)
+				if err != nil {
+					syscall.Close(int(events[i].Fd))
+					con_clients--
+					continue
+				}
+
+				writeCommand(comm, cmd)
+
+			}
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	// "log"
 	"io"
+	"fmt"
 )
 
 func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter)(error){
@@ -12,9 +13,9 @@ func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter)(error){
 	var b []byte
 
 	// log.Println("Evaluating")
-	if(command == "PING" && len(args) > 1){
-		return errors.New("ERR wrong number of arguments for 'ping' command")
-	}else if(command == "PING"){
+	if(command == "ping" && len(args) > 1){
+		return errors.New("ERR wrong number of arguments for 'PING' command")
+	}else if(command == "ping"){
 		if len(args) == 1{
 			b = Encode(args[0],false)
 		}else{
@@ -29,7 +30,6 @@ func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter)(error){
 	return err
 }
 
-func ErrorResponse(conn io.ReadWriter) error {
-	_,err := conn.Write([]byte("ERR wrong number of arguments for 'ping' command"))
-	return err
+func ErrorResponse(err error,conn io.ReadWriter) {
+		conn.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }

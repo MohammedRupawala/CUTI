@@ -3,11 +3,12 @@ package server
 import (
 	"echoserver/mod/config"
 	"echoserver/mod/core"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
-	// "strings"
+	"strings"
 )
 
 func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
@@ -23,24 +24,29 @@ func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
 		return nil, error
 	}
 
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty command")
+	}
+	data[0] = strings.ToLower(data[0])
 	return &core.RedisCmd{
-		Cmd: data[0],
-		Args: data[1:],
-	},nil
+		Cmd:  data[0],
+		Args: data[1:], 
+	}, nil
 
 	// return string(read[:n]), nil
 }
 
 func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
-    // mess := strings.ToLower(command.Cmd)
+	// mess := strings.ToLower(command.Cmd)
 
-	// log.Println(string(command.Cmd))
-    if(command.Cmd == "PING"){
-		err := core.EvalAndRespond(command,conn)
-		if err != nil{
-			core.ErrorResponse(conn)
+	// log.Println("Write Command")
+	lowerCommand := strings.ToLower(command.Cmd)
+	if lowerCommand == "ping" {
+		err := core.EvalAndRespond(command, conn)
+		if err != nil {
+			core.ErrorResponse(err,conn)
 		}
-	}else{
+	} else {
 		conn.Write([]byte("+OK\r\n"))
 	}
 }
@@ -87,7 +93,7 @@ func TcpSyncServer() {
 			// 	log.Println("Error while Writing ", err)
 			// }
 
-			writeCommand(connect,cmd)
+			writeCommand(connect, cmd)
 		}
 
 	}
