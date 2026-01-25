@@ -9,7 +9,6 @@ import (
 	"syscall"
 )
 
-// SO_REUSEPORT is not defined in syscall on some platforms, so define it if missing
 const SO_REUSEPORT = 0x0F
 
 var con_clients int = 0
@@ -85,7 +84,7 @@ func AsyncTCPServer() error {
 				}
 
 				con_clients++
-				syscall.SetNonblock(serverFD, true)
+				syscall.SetNonblock(fd, true)
 				// log.Println("Client Connected with Fd Number ", fd)
 
 				var socketClient syscall.EpollEvent = syscall.EpollEvent{

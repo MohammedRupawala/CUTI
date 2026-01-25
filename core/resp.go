@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"strings"
 	// "log"
 )
 
@@ -83,7 +84,7 @@ func DecodeArrayString(data []byte) ([]string, error) {
 	var arr = make([]string, len(val))
 
 	for i := range val {
-		arr[i] = val[i].(string)
+		arr[i] = strings.ToLower(val[i].(string))
 	}
 
 	return arr, nil
@@ -120,17 +121,18 @@ func Decode(data []byte) (interface{}, error) {
 	return val, err
 }
 
-func Encode(val interface{}, isSimple bool) []byte {
+func Encode(val interface{}, resType string) []byte {
 
-	switch v := val.(type) {
-	case string:
-		if isSimple {
-			return []byte(fmt.Sprintf("+%s\r\n",v))
+	switch resType {
+	case "simpleString":
+		return []byte(fmt.Sprintf("+%s\r\n", val))
+	case "bulkString":
+		if s, ok := val.(string); ok {
+			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(s), s))
 		}
-
-		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
+		return []byte{}
+	default:
+		return []byte{}
 	}
-
-	return []byte{}
 
 }

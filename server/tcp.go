@@ -30,7 +30,7 @@ func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
 	data[0] = strings.ToLower(data[0])
 	return &core.RedisCmd{
 		Cmd:  data[0],
-		Args: data[1:], 
+		Args: data[1:],
 	}, nil
 
 	// return string(read[:n]), nil
@@ -40,14 +40,26 @@ func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
 	// mess := strings.ToLower(command.Cmd)
 
 	// log.Println("Write Command")
-	lowerCommand := strings.ToLower(command.Cmd)
-	if lowerCommand == "ping" {
+
+	log.Println(command.Cmd)
+	switch strings.ToLower(command.Cmd) {
+	case "ping":
 		err := core.EvalAndRespond(command, conn)
 		if err != nil {
-			core.ErrorResponse(err,conn)
+			core.ErrorResponse(err, conn)
 		}
-	} else {
-		conn.Write([]byte("+OK\r\n"))
+	case "set":
+		err := core.EvalAndRespond(command, conn)
+		if err != nil {
+			core.ErrorResponse(err, conn)
+		}
+	case "get":
+		err := core.EvalAndRespond(command, conn)
+		if err != nil {
+			core.ErrorResponse(err, conn)
+		}
+	default:
+		conn.Write([]byte("+NOOK\r\n"))
 	}
 }
 
