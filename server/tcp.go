@@ -37,35 +37,11 @@ func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
 }
 
 func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
-	// mess := strings.ToLower(command.Cmd)
-
-	// log.Println("Write Command")
-
+	
 	log.Println(command.Cmd)
-	switch strings.ToLower(command.Cmd) {
-	case "ping":
-		err := core.EvalAndRespond(command, conn)
-		if err != nil {
-			core.ErrorResponse(err, conn)
-		}
-	case "set":
-		err := core.EvalAndRespond(command, conn)
-		if err != nil {
-			core.ErrorResponse(err, conn)
-		}
-	case "get":
-		err := core.EvalAndRespond(command, conn)
-		if err != nil {
-			core.ErrorResponse(err, conn)
-		}
-	case "ttl":
-		err := core.EvalAndRespond(command, conn)
-		if err != nil {
-			core.ErrorResponse(err, conn)
-		}
-	default:
-		errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command.Cmd)
-		conn.Write([]byte(errMsg))
+	err := core.EvalAndRespond(command, conn)
+	if err != nil {
+		core.ErrorResponse(err, conn)
 	}
 }
 

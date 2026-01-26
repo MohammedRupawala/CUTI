@@ -7,12 +7,14 @@ import (
 	"net"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 const SO_REUSEPORT = 0x0F
 
 var con_clients int = 0
-
+var cronFrequency time.Duration = 1 * time.Second
+var lastCronExecTime time.Time = time.Now()
 func AsyncTCPServer() error {
 
 
@@ -71,6 +73,11 @@ func AsyncTCPServer() error {
 	}
 
 	for {
+
+		if(time.Now().After(lastCronExecTime.Add(cronFrequency))){
+			core.ActiveDelete()
+			lastCronExecTime = time.Now()
+		}
 		nevents, e := syscall.EpollWait(epollFD, events[:], -1)
 		if e != nil {
 			continue

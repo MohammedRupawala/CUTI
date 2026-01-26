@@ -95,6 +95,7 @@ func evalGet(args []string) ([]byte, error) {
 	} else {
 		value := GET(args[0])
 		if value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli() || value == nil {
+			delete(storage,args[0])
 			return Encode("-1", "bulkString"), nil
 		} else {
 			return Encode(value.val, "bulkString"), nil
@@ -123,6 +124,34 @@ func evalTTL(args []string) ([]byte, error) {
 		}
 	}
 }
+
+func evalDel(args []string) ([]byte, error) {
+	n := len(args)
+
+	if n < 1 {
+		return []byte{}, errors.New("ERR wrong number of arguments for 'del' command")
+	} else {
+		res := DELETE(args)
+
+		return Encode(res, "number"), nil
+	}
+}
+
+func evalExpire(args []string) ([]byte, error) {
+	n := len(args)
+
+	if n < 2 || n > 2 {
+		return []byte{}, errors.New("ERR wrong number of arguments for 'expire' command")
+	} else {
+		expireSeconds, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			return []byte{}, errors.New("ERR value is not an integer or out of range")
+		}
+		res := Expire(args[0], expireSeconds * int64(1000))
+		return Encode(res, "number"), nil
+	}
+}
+
 func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter) error {
 	command := cmd.Cmd
 	args := cmd.Args
@@ -139,7 +168,17 @@ func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter) error {
 		b, e = evalGet(args)
 	case "ttl":
 		b, e = evalTTL(args)
+	case "del":
+		b, e = evalDel(args)
+	case "expire":
+		b, e = evalExpire(args)
+	default:
+		errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
+		b = []byte(errMsg)
+		e = nil
 	}
+
+
 
 	if e != nil {
 		return e
