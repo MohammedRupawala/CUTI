@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	// "log"
 )
@@ -129,6 +130,12 @@ func Encode(val interface{}, resType string) []byte {
 	case "bulkString":
 		if s, ok := val.(string); ok {
 			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(s), s))
+		}
+		return []byte{}
+	case "number":
+		if n,ok := val.(int64); ok{
+			log.Println("Found Number")
+			return []byte(fmt.Sprintf(":%d\r\n",n))
 		}
 		return []byte{}
 	default:

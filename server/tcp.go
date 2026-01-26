@@ -58,8 +58,14 @@ func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
 		if err != nil {
 			core.ErrorResponse(err, conn)
 		}
+	case "ttl":
+		err := core.EvalAndRespond(command, conn)
+		if err != nil {
+			core.ErrorResponse(err, conn)
+		}
 	default:
-		conn.Write([]byte("+NOOK\r\n"))
+		errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command.Cmd)
+		conn.Write([]byte(errMsg))
 	}
 }
 

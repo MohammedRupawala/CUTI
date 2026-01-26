@@ -88,16 +88,38 @@ func evalSet(args []string) ([]byte, error) {
 
 }
 
-func evalGet(args []string) ([]byte, error){
+func evalGet(args []string) ([]byte, error) {
 	n := len(args)
-	if(n > 1 || n < 1){
-		return []byte{},errors.New("ERR wrong number of arguments for 'get' command")
-	}else{
+	if n > 1 || n < 1 {
+		return []byte{}, errors.New("ERR wrong number of arguments for 'get' command")
+	} else {
 		value := GET(args[0])
-		if(value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli() || value == nil ){
-			return Encode("(nil)","simpleString"),nil
-		}else{
-			return Encode(value.val,"bulkString"),nil
+		if value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli() || value == nil {
+			return Encode("-1", "bulkString"), nil
+		} else {
+			return Encode(value.val, "bulkString"), nil
+		}
+	}
+}
+
+func evalTTL(args []string) ([]byte, error) {
+	n := len(args)
+	if n > 1 || n < 1 {
+		return []byte{}, errors.New("ERR wrong number of arguments for 'ttl' command")
+	} else {
+		value := GET(args[0])
+		if value == nil {
+			return Encode(int64(-2), "number"), nil
+		} else if value.expiresAt == -1 {
+			return Encode(int64(-1), "number"), nil
+		} else if value.expiresAt < time.Now().UnixMilli() {
+			return Encode(int64(-2), "number"), nil
+		} else {
+			remainingSeconds := (value.expiresAt - time.Now().UnixMilli()) / 1000
+			log.Printf("%d remaining Seconds\n", remainingSeconds)
+			fmt.Printf("type: %T\n", remainingSeconds)
+
+			return Encode(remainingSeconds, "number"), nil
 		}
 	}
 }
@@ -114,7 +136,9 @@ func EvalAndRespond(cmd *RedisCmd, conn io.ReadWriter) error {
 		log.Println("Set Command Found")
 		b, e = evalSet(args)
 	case "get":
-		b,e = evalGet(args)
+		b, e = evalGet(args)
+	case "ttl":
+		b, e = evalTTL(args)
 	}
 
 	if e != nil {
