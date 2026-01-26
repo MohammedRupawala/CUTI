@@ -107,7 +107,7 @@ func AsyncTCPServer() error {
 
 			} else {
 				comm := core.FDComm{Fd: int(events[i].Fd)}
-				cmd, err := readCommand(comm)
+				cmds, err := ReadMultipleCommands(comm)
 				// log.Println("Command Recieved: " + cmd.Cmd)
 				if err != nil {
 					syscall.Close(int(events[i].Fd))
@@ -115,7 +115,7 @@ func AsyncTCPServer() error {
 					continue
 				}
 
-				writeCommand(comm, cmd)
+				writeCommand(comm, cmds)
 
 			}
 		}

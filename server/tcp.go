@@ -3,46 +3,43 @@ package server
 import (
 	"echoserver/mod/config"
 	"echoserver/mod/core"
-	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
-	"strings"
 )
 
-func readCommand(conn io.ReadWriter) (*core.RedisCmd, error) {
+func ReadMultipleCommands(conn io.ReadWriter) (core.RedisCmds, error) {
 	var read [512]byte
-
 	n, err := conn.Read(read[:])
 	if err != nil {
 		return nil, err
 	}
 
-	data, error := core.DecodeArrayString(read[:n])
-	if error != nil {
-		return nil, error
+	data, err := core.DecodeArrayStrings(read[:n])
+	if err != nil {
+		return nil, err
 	}
 
-	if len(data) == 0 {
-		return nil, fmt.Errorf("empty command")
-	}
-	data[0] = strings.ToLower(data[0])
-	return &core.RedisCmd{
-		Cmd:  data[0],
-		Args: data[1:],
-	}, nil
+	var input core.RedisCmds
 
-	// return string(read[:n]), nil
+	for _, arr := range data {
+		if len(arr) > 0 {
+			cmd := &core.RedisCmd{
+				Cmd: arr[0],
+			}
+			if len(arr) > 1 {
+				cmd.Args = arr[1:]
+			}
+			input = append(input, cmd)
+		}
+	}
+	return input, nil
+
 }
 
-func writeCommand(conn io.ReadWriter, command *core.RedisCmd) {
-	
-	log.Println(command.Cmd)
-	err := core.EvalAndRespond(command, conn)
-	if err != nil {
-		core.ErrorResponse(err, conn)
-	}
+func writeCommand(conn io.ReadWriter, commands core.RedisCmds) {
+	core.EvalAndRespond(commands,conn)
 }
 
 func TcpSyncServer() {
@@ -66,7 +63,7 @@ func TcpSyncServer() {
 		// log.Println("Connected with Client with Host ", connect.RemoteAddr(), " Connected Client ", num_client)
 
 		for {
-			cmd, err := readCommand(connect)
+			cmds, err := ReadMultipleCommands(connect)
 
 			if err != nil {
 
@@ -87,7 +84,7 @@ func TcpSyncServer() {
 			// 	log.Println("Error while Writing ", err)
 			// }
 
-			writeCommand(connect, cmd)
+			writeCommand(connect, cmds)
 		}
 
 	}

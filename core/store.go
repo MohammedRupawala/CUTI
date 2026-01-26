@@ -1,6 +1,7 @@
 package core
 
 import (
+	"echoserver/mod/config"
 	"time"
 )
 
@@ -15,7 +16,6 @@ func init() {
 	storage = make(map[string]*value)
 }
 
-// type Time = time.Time
 
 func CreateObj(val interface{}, expiration int64) *value {
 
@@ -30,6 +30,9 @@ func CreateObj(val interface{}, expiration int64) *value {
 }
 
 func PUT(key string, val *value) {
+	if(len(storage) == config.MaxKeys){
+		RemoveKey()
+	}
 	storage[key] = val
 }
 
