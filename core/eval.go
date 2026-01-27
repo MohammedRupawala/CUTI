@@ -152,6 +152,21 @@ func evalExpire(args []string) []byte {
 	}
 }
 
+func evalAOF(args []string) []byte {
+	if len(args) > 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'Bbgrewriteaof' command"), "simpleString")
+	}
+
+	err := BgWrite(storage)
+	if err != nil {
+		return Encode(string(err.Error()), "simpleString")
+	} else {
+		return Encode("OK", "simpleString")
+
+	}
+
+}
+
 func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 	b := []byte{}
 	buff := bytes.NewBuffer(b)
@@ -173,6 +188,8 @@ func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 			buff.Write(evalDel(args))
 		case "expire":
 			buff.Write(evalExpire(args))
+		case "bgrewriteaof":
+			buff.Write(evalAOF(args))
 		default:
 			errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
 			buff.Write([]byte(errMsg))

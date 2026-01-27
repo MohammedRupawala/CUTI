@@ -15,7 +15,7 @@ func readLength(data []byte) (int, int) {
 	for ; data[pos] != '\r'; pos++ {
 		val = val*10 + int(data[pos]-'0')
 	}
-	
+
 	return val, pos + 2
 }
 
@@ -54,25 +54,24 @@ func decodeInt(data []byte) (interface{}, error, int) {
 func decodeArrays(data []byte) ([]interface{}, error, int) {
 
 	arrLen, delta := readLength(data)
-	
-	
+
 	var ele []interface{} = make([]interface{}, arrLen)
-	
+
 	// log.Printf("Number of Elements %d and curr posi is %d\n", arrLen, delta)
 	// log.Printf("Last Char %q ", string(data[delta]))
 
 	pos := delta
-	for i := range arrLen{
-		val , err ,delta := Parse(data[pos:])
-		if(err != nil){
-			return nil,err,0
+	for i := range arrLen {
+		val, err, delta := Parse(data[pos:])
+		if err != nil {
+			return nil, err, 0
 		}
 
 		ele[i] = val
 		pos += delta
 	}
 
-	return ele , nil , pos
+	return ele, nil, pos
 }
 
 func DecodeArrayStrings(data []byte) ([][]string, error) {
@@ -111,9 +110,9 @@ func Parse(data []byte) (interface{}, error, int) {
 	log.Printf("Parse called with data: %q", string(data))
 
 	if data[0] == '\r' || data[0] == '\n' {
-        val, err, delta := Parse(data[1:])
-        return val, err, delta + 1
-    }
+		val, err, delta := Parse(data[1:])
+		return val, err, delta + 1
+	}
 	switch data[0] {
 	case '-':
 		log.Println("Decoding Error type")
@@ -151,20 +150,42 @@ func Encode(val interface{}, resType string) []byte {
 
 	switch resType {
 	case "simpleString":
-		return []byte(fmt.Sprintf("+%s\r\n", val))
+		return fmt.Appendf(nil, "+%s\r\n", val)
 	case "bulkString":
 		if s, ok := val.(string); ok {
-			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(s), s))
+			return fmt.Appendf(nil, "$%d\r\n%s\r\n", len(s), s)
 		}
 		return []byte{}
 	case "number":
 		if n, ok := val.(int64); ok {
 			log.Println("Found Number")
-			return []byte(fmt.Sprintf(":%d\r\n", n))
+			return fmt.Appendf(nil, ":%d\r\n", n)
+		}
+		return []byte{}
+	case "arrayString":
+		if arr, ok := val.([]string); ok {
+			res := fmt.Appendf(nil, "*%d\r\n", len(arr))
+			for _, s := range arr {
+				res = append(res, Encode(s, "bulkString")...)
+			}
+			return res
+		}
+		if arr, ok := val.([]interface{}); ok {
+			res := fmt.Appendf(nil, "*%d\r\n", len(arr))
+			for _, v := range arr {
+				switch x := v.(type) {
+				case string:
+					res = append(res, Encode(x, "bulkString")...)
+				case int64:
+					res = append(res, Encode(x, "number")...)
+				default:
+					res = append(res, Encode(fmt.Sprintf("%v", x), "bulkString")...)
+				}
+			}
+			return res
 		}
 		return []byte{}
 	default:
 		return []byte{}
 	}
-
 }
