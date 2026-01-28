@@ -14,7 +14,7 @@ func dump(key string, val *value, f *os.File){
 		ttl := val.expiresAt - time.Now().UnixMilli()
 
 		if(ttl > 0){
-			cmd := fmt.Sprintf("SET %s %s EX %d", key,val.val,val.expiresAt)
+			cmd := fmt.Sprintf("SET %s %s EX %d", key,val.val,ttl)
 			tokens := strings.Split(cmd," ")
 			f.Write(Encode(tokens,"arrayString"))
 		}
@@ -34,13 +34,6 @@ func BgWrite(data map[string] *value) error {
 	defer tmpFile.Close()
 
 	for k, v := range data {
-		// cmd := fmt.Sprintf("SET %s %v\n", k, v)
-		// _, err := tmpFile.WriteString(cmd)
-		// if err != nil {
-		// 	log.Println("Error writing to temp file:", err)
-		// 	return err
-		// }
-
 		dump(k,v,tmpFile)
 	}
 

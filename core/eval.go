@@ -36,6 +36,8 @@ func evalSet(args []string) []byte {
 
 	key := args[0]
 	val := args[1]
+
+	vType, vEnc := deduceTypeEncoding(val)
 	var exDurationMs int64
 	var expFound bool
 	for i := 2; i < n; i++ {
@@ -80,9 +82,9 @@ func evalSet(args []string) []byte {
 	}
 
 	if exDurationMs > 0 {
-		PUT(key, CreateObj(val, exDurationMs))
+		PUT(key, CreateObj(val, exDurationMs,vType, vEnc))
 	} else {
-		PUT(key, CreateObj(val, -1))
+		PUT(key, CreateObj(val, -1,vType, vEnc))
 	}
 	b = Encode("OK", "simpleString")
 	return b
@@ -167,6 +169,36 @@ func evalAOF(args []string) []byte {
 
 }
 
+
+func evalIncr(args[] string) []byte{
+
+	if len(args) != 1{
+		return Encode(errors.New("ERR wrong number of arguments for 'incr' command"), "simpleString")
+	}
+
+	key := args[0]
+	obj := GET(args[0])
+
+	if obj == nil{
+		obj = CreateObj("0",-1,OBJ_TYPE_STRING,OBJ_ENCODING_INT)
+		PUT(key,obj)
+	}else{
+		if err := chckType(obj.TypeEncoding,OBJ_TYPE_STRING); err != nil{
+			return Encode(err,"simpleString")
+		}
+
+
+		if err := checkEncoding(obj.TypeEncoding,OBJ_ENCODING_INT); err != nil{
+			return Encode(err,"simpleString")
+		}
+		
+	}
+	count, _ := strconv.ParseInt(obj.val.(string),10,64)
+	count++;
+
+	obj.val = strconv.FormatInt(count,10)
+	return Encode(count,"number")
+}
 func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 	b := []byte{}
 	buff := bytes.NewBuffer(b)
@@ -190,6 +222,8 @@ func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 			buff.Write(evalExpire(args))
 		case "bgrewriteaof":
 			buff.Write(evalAOF(args))
+		case "incr":
+			buff.Write(evalIncr(args))
 		default:
 			errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
 			buff.Write([]byte(errMsg))

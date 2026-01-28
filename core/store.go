@@ -7,8 +7,11 @@ import (
 
 type value struct {
 	val       interface{}
+	TypeEncoding uint8
 	expiresAt int64
 }
+
+
 
 var storage map[string]*value
 
@@ -17,14 +20,15 @@ func init() {
 }
 
 
-func CreateObj(val interface{}, expiration int64) *value {
+func CreateObj(val interface{}, expiration int64, t uint8 , encoding uint8) *value {
 
 	var expiresAt int64 = -1
 	if expiration > 0 {
 		expiresAt = time.Now().UnixMilli() + expiration
 	}
 	return &value{
-		val:       val,
+		val:  val,
+		TypeEncoding: t | encoding,
 		expiresAt: expiresAt,
 	}
 }
