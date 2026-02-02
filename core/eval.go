@@ -82,9 +82,9 @@ func evalSet(args []string) []byte {
 	}
 
 	if exDurationMs > 0 {
-		PUT(key, CreateObj(val, exDurationMs,vType, vEnc))
+		PUT(key, CreateObj(val, exDurationMs, vType, vEnc))
 	} else {
-		PUT(key, CreateObj(val, -1,vType, vEnc))
+		PUT(key, CreateObj(val, -1, vType, vEnc))
 	}
 	b = Encode("OK", "simpleString")
 	return b
@@ -97,9 +97,9 @@ func evalGet(args []string) []byte {
 		return Encode(errors.New("(error) ERR wrong number of arguments for 'get' command"), "simpleString")
 	} else {
 		value := GET(args[0])
-		if value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli() || value == nil {
+		if value == nil || value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli(){
 			delete(storage, args[0])
-			return Encode("-1", "bulkString")
+			return Encode("(nil)", "simpleString")
 		} else {
 			return Encode(value.val, "bulkString")
 		}
@@ -169,35 +169,45 @@ func evalAOF(args []string) []byte {
 
 }
 
+func evalIncr(args []string) []byte {
 
-func evalIncr(args[] string) []byte{
-
-	if len(args) != 1{
+	if len(args) != 1 {
 		return Encode(errors.New("ERR wrong number of arguments for 'incr' command"), "simpleString")
 	}
 
 	key := args[0]
 	obj := GET(args[0])
 
-	if obj == nil{
-		obj = CreateObj("0",-1,OBJ_TYPE_STRING,OBJ_ENCODING_INT)
-		PUT(key,obj)
-	}else{
-		if err := chckType(obj.TypeEncoding,OBJ_TYPE_STRING); err != nil{
-			return Encode(err,"simpleString")
+	if obj == nil {
+		obj = CreateObj("0", -1, OBJ_TYPE_STRING, OBJ_ENCODING_INT)
+		PUT(key, obj)
+	} else {
+		if err := chckType(obj.TypeEncoding, OBJ_TYPE_STRING); err != nil {
+			return Encode(err, "simpleString")
 		}
 
-
-		if err := checkEncoding(obj.TypeEncoding,OBJ_ENCODING_INT); err != nil{
-			return Encode(err,"simpleString")
+		if err := checkEncoding(obj.TypeEncoding, OBJ_ENCODING_INT); err != nil {
+			return Encode(err, "simpleString")
 		}
-		
+
 	}
-	count, _ := strconv.ParseInt(obj.val.(string),10,64)
-	count++;
+	count, _ := strconv.ParseInt(obj.val.(string), 10, 64)
+	count++
 
-	obj.val = strconv.FormatInt(count,10)
-	return Encode(count,"number")
+	obj.val = strconv.FormatInt(count, 10)
+	return Encode(count, "number")
+}
+
+func evalInfo(args []string) []byte {
+
+	var buff = bytes.NewBuffer([]byte{})
+
+	buff.Write(Encode("# Keyspace", "bulkString"))
+	for i := range KeyspaceStat {
+		buff.WriteString(fmt.Sprintf("db%d:keys=%d,expires=0,avg_ttl=0\r\n", i, KeyspaceStat[i]["keys"]))
+	}
+	return (Encode(buff.String(),"bulkString"))
+
 }
 func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 	b := []byte{}
@@ -210,7 +220,7 @@ func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 		case "ping":
 			buff.Write(evalPing(args))
 		case "set":
-			log.Println("Set Command Found")
+			// log.Println("Set Command Found")
 			buff.Write(evalSet(args))
 		case "get":
 			buff.Write(evalGet(args))
@@ -224,6 +234,8 @@ func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 			buff.Write(evalAOF(args))
 		case "incr":
 			buff.Write(evalIncr(args))
+		case "info":
+			buff.Write(evalInfo(args))
 		default:
 			errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
 			buff.Write([]byte(errMsg))

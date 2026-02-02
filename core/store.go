@@ -6,12 +6,10 @@ import (
 )
 
 type value struct {
-	val       interface{}
+	val          interface{}
 	TypeEncoding uint8
-	expiresAt int64
+	expiresAt    int64
 }
-
-
 
 var storage map[string]*value
 
@@ -19,50 +17,58 @@ func init() {
 	storage = make(map[string]*value)
 }
 
-
-func CreateObj(val interface{}, expiration int64, t uint8 , encoding uint8) *value {
+func CreateObj(val interface{}, expiration int64, t uint8, encoding uint8) *value {
 
 	var expiresAt int64 = -1
 	if expiration > 0 {
 		expiresAt = time.Now().UnixMilli() + expiration
 	}
 	return &value{
-		val:  val,
+		val:          val,
 		TypeEncoding: t | encoding,
-		expiresAt: expiresAt,
+		expiresAt:    expiresAt,
 	}
-}
-
-func PUT(key string, val *value) {
-	if(len(storage) == config.MaxKeys){
-		RemoveKey()
-	}
-	storage[key] = val
 }
 
 func GET(key string) *value {
 	return storage[key]
 }
 
-func DELETE(keys []string) int64 {
-    var total int64 = 0
+func PUT(key string, val *value) {
+	if len(storage) == config.MaxKeys {
+		RemoveKey()
+	}
 
-    for _, key := range keys {
-        if _, exists := storage[key]; exists {
-            delete(storage, key)
-            total++ 
-        }
-    }
-    
-    return total
+	if KeyspaceStat[0] == nil {
+		KeyspaceStat[0] = make(map[string]int)
+	}
+
+	if GET(key) == nil {
+		KeyspaceStat[0]["keys"]++
+	}
+	storage[key] = val
 }
 
-func Expire(key string , number int64) int64{
+func DELETE(keys []string) int64 {
+	var total int64 = 0
+
+	for _, key := range keys {
+		if _, exists := storage[key]; exists {
+			KeyspaceStat[0]["keys"]--
+			delete(storage, key)
+			total++
+		}
+	}
+
+	return total
+}
+
+func Expire(key string, number int64) int64 {
 	val := GET(key)
 
-	if(val == nil){
+	if val == nil {
 		return int64(0)
-	}else{
+	} else {
 		val.expiresAt = time.Now().UnixMilli() + number
 		return int64(1)
 	}
