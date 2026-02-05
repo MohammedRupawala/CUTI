@@ -11,12 +11,11 @@ func DeleteExpiredKeys() float32 {
 
 	for key, val := range storage {
 
-		if val.expiresAt != -1 {
-			limit--
-			if val.expiresAt <= time.Now().UnixMilli() {
-				expiredCount++;
-				delete(storage,key)
-			}
+		exp, ok := expires[val]
+		if ok && exp <= uint64(time.Now().UnixMilli()){
+			delete(storage,key)
+			delete(expires,val)
+			limit--;
 		}
 		if(limit == 0){
 			break
@@ -26,6 +25,17 @@ func DeleteExpiredKeys() float32 {
 	return float32(expiredCount) / float32(20.0)
 }
 
+
+func hasexpired(val *value) bool{
+	exp, ok := expires[val]
+	// log.Print("Expires is thier or not ", exp)
+	if !ok{
+		return false
+	}
+	log.Println("Has Expired?")
+	return exp <= uint64(time.Now().UnixMilli())
+
+}
 
 
 func ActiveDelete(){

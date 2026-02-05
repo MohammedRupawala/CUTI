@@ -10,8 +10,8 @@ import (
 
 
 func dump(key string, val *value, f *os.File){
-	if(val.expiresAt != -1){
-		ttl := val.expiresAt - time.Now().UnixMilli()
+	if(expires[val] != 0){
+		ttl := int64(expires[val]) - time.Now().UnixMilli()
 
 		if(ttl > 0){
 			cmd := fmt.Sprintf("SET %s %s EX %d", key,val.val,ttl)

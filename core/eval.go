@@ -86,6 +86,11 @@ func evalSet(args []string) []byte {
 	} else {
 		PUT(key, CreateObj(val, -1, vType, vEnc))
 	}
+	v := storage[key]
+	exp := expires[v]
+	log.Println("Expires" ,exp)
+	log.Println("Value" ,v)
+
 	b = Encode("OK", "simpleString")
 	return b
 
@@ -97,8 +102,8 @@ func evalGet(args []string) []byte {
 		return Encode(errors.New("(error) ERR wrong number of arguments for 'get' command"), "simpleString")
 	} else {
 		value := GET(args[0])
-		if value == nil || value.expiresAt != -1 && value.expiresAt < time.Now().UnixMilli(){
-			delete(storage, args[0])
+		log.Println("Value is ",value)
+		if value == nil {
 			return Encode("(nil)", "simpleString")
 		} else {
 			return Encode(value.val, "bulkString")
@@ -112,14 +117,12 @@ func evalTTL(args []string) []byte {
 		return Encode(errors.New("ERR wrong number of arguments for 'ttl' command"), "simpleString")
 	} else {
 		value := GET(args[0])
+		log.Println("Value is " ,value)
 		if value == nil {
 			return Encode(int64(-2), "number")
-		} else if value.expiresAt == -1 {
-			return Encode(int64(-1), "number")
-		} else if value.expiresAt < time.Now().UnixMilli() {
-			return Encode(int64(-2), "number")
 		} else {
-			remainingSeconds := (value.expiresAt - time.Now().UnixMilli()) / 1000
+			exp := TTL(value)
+			remainingSeconds := (int64(exp) - time.Now().UnixMilli()) / 1000
 			log.Printf("%d remaining Seconds\n", remainingSeconds)
 			fmt.Printf("type: %T\n", remainingSeconds)
 			return Encode(remainingSeconds, "number")
@@ -206,8 +209,21 @@ func evalInfo(args []string) []byte {
 	for i := range KeyspaceStat {
 		buff.WriteString(fmt.Sprintf("db%d:keys=%d,expires=0,avg_ttl=0\r\n", i, KeyspaceStat[i]["keys"]))
 	}
-	return (Encode(buff.String(),"bulkString"))
+	return (Encode(buff.String(), "bulkString"))
 
+}
+
+func evalCLIENT(args []string) []byte {
+	return Encode("OK","simpleString")
+}
+
+func evalLATENCY(args []string) []byte {
+	return Encode([]string{}, "bulkString")
+}
+
+func evalLRU(args []string) []byte {
+	approxLru()
+	return Encode("OK","simpleString")
 }
 func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 	b := []byte{}
@@ -236,6 +252,12 @@ func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
 			buff.Write(evalIncr(args))
 		case "info":
 			buff.Write(evalInfo(args))
+		case "client":
+			buff.Write(evalCLIENT(args))
+		case "latency":
+			buff.Write(evalLATENCY(args))
+		case "lru":
+			buff.Write(evalLRU(args))
 		default:
 			errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
 			buff.Write([]byte(errMsg))
