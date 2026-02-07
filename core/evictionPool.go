@@ -28,7 +28,6 @@ func (arr idleTime) Less(i, j int) bool {
 
 func (pq *EvictionPool) Push(key string, lastAccessedAt uint32) {
 
-	// arr := pq.pool
 	_, ok := pq.keyset[key]
 	if ok {
 		return

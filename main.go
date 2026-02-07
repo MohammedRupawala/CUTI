@@ -5,6 +5,10 @@ import (
 	"echoserver/mod/server"
 	"flag"
 	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 )
 
 func setUp() {
@@ -15,13 +19,27 @@ func setUp() {
 func main() {
 	log.Println("Lets Win THis")
 	setUp()
-	server.AsyncTCPServer()
 
-	if err := server.AsyncTCPServer(); err != nil {
+
+	var signalPipe chan os.Signal = make(chan os.Signal,1)
+	signal.Notify(signalPipe,syscall.SIGTERM,syscall.SIGINT)
+
+
+	var wg sync.WaitGroup 
+	wg.Add(2)
+
+
+
+	go server.AsyncTCPServer(&wg)
+	go server.WaitForSignal(signalPipe,&wg)
+
+	if err := server.AsyncTCPServer(&wg); err != nil {
 		log.Fatal("Server failed:", err)
 	}
 
 	// core_test.TestArrayDecode
 
+
+	wg.Wait()
 
 }

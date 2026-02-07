@@ -5,7 +5,10 @@ import (
 	"echoserver/mod/core"
 	"log"
 	"net"
+	"os"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -15,8 +18,35 @@ const SO_REUSEPORT = 0x0F
 var con_clients int = 0
 var cronFrequency time.Duration = 1 * time.Second
 var lastCronExecTime time.Time = time.Now()
-func AsyncTCPServer() error {
 
+const EngineStatus_WAITING int32 = 1 << 1
+const EngineStatus_BUSY int32 = 1 << 2
+const EngineStatus_SHUTTING_DOWN int32 = 1 << 3
+
+var eStatus int32 = EngineStatus_WAITING
+
+func WaitForSignal(signal chan os.Signal, wg *sync.WaitGroup) {
+
+	<-signal
+
+	for atomic.LoadInt32(&eStatus) == EngineStatus_BUSY {
+
+	}
+
+	log.Println("Server Trying To Shutdown Intialized")
+
+	atomic.StoreInt32(&eStatus, EngineStatus_SHUTTING_DOWN)
+	core.Shutdown()
+	log.Println("Server Ready to Exit")
+
+	os.Exit(0)
+}
+func AsyncTCPServer(wg *sync.WaitGroup) error {
+
+	defer wg.Done()
+	defer func() {
+		atomic.StoreInt32(&eStatus, EngineStatus_SHUTTING_DOWN)
+	}()
 
 	log.Println("Welcome To Async Server " + config.Host + " Running at Port " + strconv.Itoa(config.Port))
 
@@ -72,15 +102,22 @@ func AsyncTCPServer() error {
 		return err
 	}
 
-	for {
+	for atomic.LoadInt32(&eStatus) != EngineStatus_SHUTTING_DOWN {
 
-		if(time.Now().After(lastCronExecTime.Add(cronFrequency))){
+		if time.Now().After(lastCronExecTime.Add(cronFrequency)) {
 			core.ActiveDelete()
 			lastCronExecTime = time.Now()
 		}
 		nevents, e := syscall.EpollWait(epollFD, events[:], -1)
 		if e != nil {
 			continue
+		}
+
+		if !atomic.CompareAndSwapInt32(&eStatus, EngineStatus_WAITING, EngineStatus_BUSY) {
+			switch eStatus {
+			case EngineStatus_SHUTTING_DOWN:
+				return nil
+			}
 		}
 
 		for i := 0; i < nevents; i++ {
@@ -119,5 +156,9 @@ func AsyncTCPServer() error {
 
 			}
 		}
+
+		atomic.StoreInt32(&eStatus, EngineStatus_WAITING)
 	}
+
+	return nil
 }
