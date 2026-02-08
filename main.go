@@ -33,9 +33,9 @@ func main() {
 	go server.AsyncTCPServer(&wg)
 	go server.WaitForSignal(signalPipe,&wg)
 
-	if err := server.AsyncTCPServer(&wg); err != nil {
-		log.Fatal("Server failed:", err)
-	}
+	// if err := server.AsyncTCPServer(&wg); err != nil {
+	// 	log.Fatal("Server failed:", err)
+	// }
 
 	// core_test.TestArrayDecode
 

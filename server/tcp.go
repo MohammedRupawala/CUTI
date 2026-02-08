@@ -1,15 +1,11 @@
 package server
 
 import (
-	"echoserver/mod/config"
 	"echoserver/mod/core"
-	"io"
-	"log"
-	"net"
-	"strconv"
+	// "io"	
 )
 
-func ReadMultipleCommands(conn io.ReadWriter) (core.RedisCmds, error) {
+func ReadMultipleCommands(conn *core.Client) (core.RedisCmds, error) {
 	var read [512]byte
 	n, err := conn.Read(read[:])
 	if err != nil {
@@ -38,55 +34,55 @@ func ReadMultipleCommands(conn io.ReadWriter) (core.RedisCmds, error) {
 
 }
 
-func writeCommand(conn io.ReadWriter, commands core.RedisCmds) {
+func writeCommand(conn *core.Client, commands core.RedisCmds) {
 	core.EvalAndRespond(commands,conn)
 }
 
-func TcpSyncServer() {
-	log.Println("You are In Server And The Host is ", config.Host+"Running on Port ", config.Port)
+// func TcpSyncServer() {
+// 	log.Println("You are In Server And The Host is ", config.Host+"Running on Port ", config.Port)
 
-	var num_client int = 0
+// 	var num_client int = 0
 
-	listen, err := net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
-	if err != nil {
-		panic(err)
-	}
+// 	listen, err := net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	for {
-		connect, err := listen.Accept()
+// 	for {
+// 		connect, err := listen.Accept()
 
-		if err != nil {
-			panic(err)
-		}
+// 		if err != nil {
+// 			panic(err)
+// 		}
 
-		num_client += 1
-		// log.Println("Connected with Client with Host ", connect.RemoteAddr(), " Connected Client ", num_client)
+// 		connect
+// 		// log.Println("Connected with Client with Host ", connect.RemoteAddr(), " Connected Client ", num_client)
 
-		for {
-			cmds, err := ReadMultipleCommands(connect)
+// 		for {
+// 			cmds, err := ReadMultipleCommands(connect)
 
-			if err != nil {
+// 			if err != nil {
 
-				num_client -= 1
-				log.Println("Connection Disconnected With host ", connect.RemoteAddr(), "Connected Clients ", num_client)
+// 				num_client -= 1
+// 				log.Println("Connection Disconnected With host ", connect.RemoteAddr(), "Connected Clients ", num_client)
 
-				if err == io.EOF {
-					break
-				}
+// 				if err == io.EOF {
+// 					break
+// 				}
 
-				log.Println("err ", err)
+// 				log.Println("err ", err)
 
-			}
+// 			}
 
-			// log.Println("Command Recieved From Client ", cmd)
+// 			// log.Println("Command Recieved From Client ", cmd)
 
-			// if err = writeCommand(connect, cmd); err != nil {
-			// 	log.Println("Error while Writing ", err)
-			// }
+// 			// if err = writeCommand(connect, cmd); err != nil {
+// 			// 	log.Println("Error while Writing ", err)
+// 			// }
 
-			writeCommand(connect, cmds)
-		}
+// 			writeCommand(=, cmds)
+// 		}
 
-	}
+// 	}
 
-}
+// }

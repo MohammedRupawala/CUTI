@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+var connectedClients map[int]*core.Client
+
 const SO_REUSEPORT = 0x0F
 
 var con_clients int = 0
@@ -25,9 +27,13 @@ const EngineStatus_SHUTTING_DOWN int32 = 1 << 3
 
 var eStatus int32 = EngineStatus_WAITING
 
-func WaitForSignal(signal chan os.Signal, wg *sync.WaitGroup) {
+func init() {
+	connectedClients = make(map[int]*core.Client)
+}
 
+func WaitForSignal(signal chan os.Signal, wg *sync.WaitGroup) {
 	<-signal
+	log.Println("Interrupt Signal Detected")
 
 	for atomic.LoadInt32(&eStatus) == EngineStatus_BUSY {
 
@@ -108,6 +114,7 @@ func AsyncTCPServer(wg *sync.WaitGroup) error {
 			core.ActiveDelete()
 			lastCronExecTime = time.Now()
 		}
+
 		nevents, e := syscall.EpollWait(epollFD, events[:], -1)
 		if e != nil {
 			continue
@@ -119,14 +126,16 @@ func AsyncTCPServer(wg *sync.WaitGroup) error {
 				return nil
 			}
 		}
+		log.Print("Server Is Not in Shutting Down Stage\n")
 
 		for i := 0; i < nevents; i++ {
 			if int(events[i].Fd) == serverFD {
 				fd, _, err := syscall.Accept(serverFD)
+				log.Printf("New Client Accepted with fd %d\n", fd)
 				if err != nil {
 					continue
 				}
-
+				connectedClients[fd] = core.NewClient(fd)
 				con_clients++
 				syscall.SetNonblock(fd, true)
 				// log.Println("Client Connected with Fd Number ", fd)
@@ -143,14 +152,16 @@ func AsyncTCPServer(wg *sync.WaitGroup) error {
 				// log.Println("Connected With Client " + sockaddrToString(addr))
 
 			} else {
-				comm := core.FDComm{Fd: int(events[i].Fd)}
+				comm := connectedClients[int(events[i].Fd)]
 				cmds, err := ReadMultipleCommands(comm)
-				// log.Println("Command Recieved: " + cmd.Cmd)
 				if err != nil {
 					syscall.Close(int(events[i].Fd))
-					con_clients--
+					// con_clients--
+					delete(connectedClients, int(events[i].Fd))
+
 					continue
 				}
+				log.Println("Command Recieved: ", cmds)
 
 				writeCommand(comm, cmds)
 

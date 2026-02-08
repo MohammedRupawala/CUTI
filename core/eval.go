@@ -88,8 +88,8 @@ func evalSet(args []string) []byte {
 	}
 	v := storage[key]
 	exp := expires[v]
-	log.Println("Expires" ,exp)
-	log.Println("Value" ,v)
+	log.Println("Expires", exp)
+	log.Println("Value", v)
 
 	b = Encode("OK", "simpleString")
 	return b
@@ -102,7 +102,7 @@ func evalGet(args []string) []byte {
 		return Encode(errors.New("(error) ERR wrong number of arguments for 'get' command"), "simpleString")
 	} else {
 		value := GET(args[0])
-		log.Println("Value is ",value)
+		log.Println("Value is ", value)
 		if value == nil {
 			return Encode("(nil)", "simpleString")
 		} else {
@@ -117,7 +117,7 @@ func evalTTL(args []string) []byte {
 		return Encode(errors.New("ERR wrong number of arguments for 'ttl' command"), "simpleString")
 	} else {
 		value := GET(args[0])
-		log.Println("Value is " ,value)
+		log.Println("Value is ", value)
 		if value == nil {
 			return Encode(int64(-2), "number")
 		} else {
@@ -214,7 +214,7 @@ func evalInfo(args []string) []byte {
 }
 
 func evalCLIENT(args []string) []byte {
-	return Encode("OK","simpleString")
+	return Encode("OK", "simpleString")
 }
 
 func evalLATENCY(args []string) []byte {
@@ -223,50 +223,122 @@ func evalLATENCY(args []string) []byte {
 
 func evalLRU(args []string) []byte {
 	approxLru()
-	return Encode("OK","simpleString")
+	return Encode("OK", "simpleString")
 }
-func EvalAndRespond(cmd RedisCmds, conn io.ReadWriter) {
-	b := []byte{}
-	buff := bytes.NewBuffer(b)
-	for _, val := range cmd {
-		command := val.Cmd
-		args := val.Args
 
-		switch command {
-		case "ping":
-			buff.Write(evalPing(args))
-		case "set":
-			// log.Println("Set Command Found")
-			buff.Write(evalSet(args))
-		case "get":
-			buff.Write(evalGet(args))
-		case "ttl":
-			buff.Write(evalTTL(args))
-		case "del":
-			buff.Write(evalDel(args))
-		case "expire":
-			buff.Write(evalExpire(args))
-		case "bgrewriteaof":
-			buff.Write(evalAOF(args))
-		case "incr":
-			buff.Write(evalIncr(args))
-		case "info":
-			buff.Write(evalInfo(args))
-		case "client":
-			buff.Write(evalCLIENT(args))
-		case "latency":
-			buff.Write(evalLATENCY(args))
-		case "lru":
-			buff.Write(evalLRU(args))
-		default:
-			errMsg := fmt.Sprintf("+(error) ERR unknown command '%s', with args beginning with:\r\n", command)
-			buff.Write([]byte(errMsg))
+func evalTx(args []string, c *Client) []byte {
+	n := len(args)
+	if n > 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'multi' command"), "simpleString")
+	}
+	return Exec(c)
+}
+func EvalAndRespond(cmds RedisCmds, c *Client) {
+
+	var response []byte
+	buf := bytes.NewBuffer(response)
+
+	for _, val := range cmds {
+		if !c.isTxn {
+			executeCommandToBuffer(val, buf, c)
+			continue
+		}
+
+		if val.Cmd != "discard" && val.Cmd != "exec" {
+			AddToQueue(c, val)
+			buf.Write([]byte("+QUEUE\r\n"))
+		} else {
+			log.Println("Exec Command Found")
+			executeCommandToBuffer(val, buf, c)
 		}
 	}
 
-	conn.Write(buff.Bytes())
+	c.Write(buf.Bytes())
 }
 
+func Exec(c *Client) []byte {
+	// TODO: implement command execution logic
+	b := []byte{}
+	buff := bytes.NewBuffer(b)
+	cqueue := c.queue
+	buff.Write([]byte(fmt.Sprintf("*%d\r\n", len(cqueue))))
+	for _, val := range cqueue {
+		buff.Write(executeCommand(val.Cmd, val.Args, c))
+	}
+
+	TxExec(c)
+	return buff.Bytes()
+}
+
+func executeCommand(cmd string, args []string, c *Client) []byte {
+	switch cmd {
+	case "ping":
+		return (evalPing(args))
+	case "set":
+		// log.Println("Set Command Found")
+		return (evalSet(args))
+	case "get":
+		return (evalGet(args))
+	case "ttl":
+		return (evalTTL(args))
+	case "del":
+		return (evalDel(args))
+	case "expire":
+		return (evalExpire(args))
+	case "bgrewriteaof":
+		return (evalAOF(args))
+	case "incr":
+		return (evalIncr(args))
+	case "info":
+		return (evalInfo(args))
+	case "client":
+		return (evalCLIENT(args))
+	case "latency":
+		return (evalLATENCY(args))
+	case "lru":
+		return (evalLRU(args))
+	case "multi":
+		if len(args) > 0 {
+			return Encode("(error) ERR wrong number of arguments for 'multi' command", "simpleString")
+		}
+		if c.isTxn {
+			return Encode("(error) ERR MULTI calls can not be nested", "simpleString")
+		}
+		c.isTxn = true
+		return []byte("+OK\r\n")
+	case "discard":
+		if len(args) > 0 {
+			return Encode("(error) ERR wrong number of arguments for 'discard' command", "simpleString")
+		}
+		if !c.isTxn {
+			return Encode("(error) ERR DISCARD without MULTI", "simpleString")
+		}
+
+		TxDiscard(c)
+		return []byte("+OK\r\n")
+	case "exec":
+		if len(args) > 0 {
+			return Encode("(error) ERR wrong number of arguments for 'discard' command", "simpleString")
+		}
+		if !c.isTxn {
+			return Encode("(error) ERR Exec without MULTI", "simpleString")
+		}
+		return evalTx(args, c)
+
+	default:
+		errMsg := fmt.Sprintf(
+			"-ERR unknown command '%s', with args beginning with:\r\n",
+			cmd,
+		)
+		return ([]byte(errMsg))
+	}
+}
+
+func executeCommandToBuffer(cmd *RedisCmd, buf *bytes.Buffer, c *Client) {
+	buf.Write(executeCommand(cmd.Cmd, cmd.Args, c))
+
+	// c.Write(buf.Bytes())
+}
 func ErrorResponse(err error, conn io.ReadWriter) {
 	conn.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }
